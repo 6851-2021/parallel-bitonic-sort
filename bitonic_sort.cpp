@@ -5,7 +5,13 @@
 #include <cassert>
 #include <cstdlib>
 
-#include <cilk/cilk.h>
+#ifdef NPARALLEL
+  #define cilk_for for
+  #define cilk_spawn
+  #define cilk_sync
+#else
+  #include <cilk/cilk.h>
+#endif
 
 template <class RandomIt, class Compare>
 void bitonic_sort(RandomIt first, RandomIt last, Compare comp) {
