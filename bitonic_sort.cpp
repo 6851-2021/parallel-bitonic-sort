@@ -9,12 +9,16 @@
   #define cilk_for for
   #define cilk_spawn
   #define cilk_sync
+
+  #define bitonic_sort serial_bitonic_sort
 #else
   #include <cilk/cilk.h>
+
+  #define bitonic_sort parallel_bitonic_sort
 #endif
 
 template <class RandomIt, class Compare>
-void bitonic_sort(RandomIt first, RandomIt last, Compare comp) {
+void serial_bitonic_sort(RandomIt first, RandomIt last, Compare comp) {
   const auto len = std::distance(first, last);
   if (len <= 1) {
     return;
@@ -24,7 +28,7 @@ void bitonic_sort(RandomIt first, RandomIt last, Compare comp) {
   const auto mid = first + half_len;
 
   using difference_type = typename std::iterator_traits<RandomIt>::difference_type;
-  cilk_for (difference_type i{}; i < half_len; ++i) {
+  for (difference_type i{}; i < half_len; ++i) {
     const auto left = first + i;
     const auto right = mid + i;
     if (comp(*right, *left)) {
@@ -32,8 +36,31 @@ void bitonic_sort(RandomIt first, RandomIt last, Compare comp) {
     }
   }
 
-  cilk_spawn bitonic_sort(first, mid, comp);
-  bitonic_sort(mid, last, comp);
+  serial_bitonic_sort(first, mid, comp);
+  serial_bitonic_sort(mid, last, comp);
+}
+
+template <class RandomIt, class Compare>
+void parallel_bitonic_sort(RandomIt first, RandomIt last, Compare comp) {
+  const auto len = std::distance(first, last);
+  if (len <= 4194304) {
+    return serial_bitonic_sort(first, last, comp);
+  }
+  const auto half_len = len / 2;
+
+  const auto mid = first + half_len;
+
+  using difference_type = typename std::iterator_traits<RandomIt>::difference_type;
+  for (difference_type i{}; i < half_len; ++i) {
+    const auto left = first + i;
+    const auto right = mid + i;
+    if (comp(*right, *left)) {
+      std::iter_swap(left, right);
+    }
+  }
+
+  cilk_spawn parallel_bitonic_sort(first, mid, comp);
+  parallel_bitonic_sort(mid, last, comp);
 
   cilk_sync;
 }
